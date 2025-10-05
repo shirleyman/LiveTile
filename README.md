@@ -1,4 +1,4 @@
-# Live Tile
+# LiveTile - Seamless Background Visualizer
 
 A simple, client-side tool for visualizing seamless tiles in real-time.
 
