@@ -15,7 +15,7 @@ A simple, client-side tool for visualizing seamless tiles in real-time.
 ## How to Use
 
 1.  **Open the page:**
-    *   https://shirleyman.github.io/LiveTile/
+    *   https://shirleyman.github.io/live-tile/
       
 3.  **Load an image:**
     *   Drag and drop your image file onto the grid.
