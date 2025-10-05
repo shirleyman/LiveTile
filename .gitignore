@@ -1,0 +1,20 @@
+# Dependencies
+/node_modules
+
+# Build artifacts
+/dist
+/build
+
+# Logs
+npm-debug.log*
+*.log
+
+# Environment variables
+.env
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Gemini file
+GEMINI.md
