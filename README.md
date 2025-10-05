@@ -2,7 +2,7 @@
 
 A simple, client-side tool for visualizing seamless tiles in real-time.
 
-![Screenshot of Live Tile](TODO)
+![Screenshot of Live Tile](screenshot.png)
 
 ## Features
 
