@@ -232,9 +232,11 @@
     </ol>
   </div>
 
+<canvas id="colorSampler" style="display:none;"></canvas>
+
 <script>
 /* ========== Configuration ========== */
-const MIN_N = 1;
+const MIN_N = 0.25;
 const MAX_N = 10;
 const POLL_MS = 200; // throttle file polling
 
@@ -246,6 +248,7 @@ let objectURL = null;
 let watching = false;
 let pollTimer = null;
 let gridVisible = false;
+let gridLineColor = 'rgba(0,0,0,0.5)';
 
 // Panning state
 let isPanning = false;
@@ -273,7 +276,11 @@ function showOverlay(text, duration=700){
   zoomOverlay._to = setTimeout(()=>zoomOverlay.classList.remove('show'), duration);
 }
 function updateTop() {
-  gridSizeSelect.value = N;
+  if (N >= 1) {
+    gridSizeSelect.value = Math.round(N);
+  } else {
+    gridSizeSelect.value = 1;
+  }
 }
 function updateMetaFile(name){
   fileNameEl.textContent = name ? name : 'No file';
@@ -302,7 +309,6 @@ function updateStageBackground() {
 
     // Grid layers (top)
     if (gridVisible) {
-        const gridLineColor = 'rgba(0,0,0,0.5)';
         // Horizontal lines
         bgImages.push(`linear-gradient(${gridLineColor} 1px, transparent 1px)`);
         bgSizes.push(`${tileSize}px ${tileSize}px`);
@@ -354,8 +360,47 @@ function toggleGrid() {
 function refreshTiles(newUrl){
   if(objectURL && objectURL !== newUrl){ URL.revokeObjectURL(objectURL); }
   objectURL = newUrl;
+
+  // Reset pan and zoom to default
   panOffset = { x: 0, y: 0 };
-  updateStageBackground();
+  N = 3;
+  updateTop();
+
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.getElementById('colorSampler');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    let totalLuminance = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i+1];
+      const b = data[i+2];
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      totalLuminance += luminance;
+    }
+    const avgLuminance = totalLuminance / (data.length / 4);
+
+    if (avgLuminance < 128) {
+      gridLineColor = 'rgba(255,255,255,0.5)'; // Light lines for dark images
+    } else {
+      gridLineColor = 'rgba(0,0,0,0.5)'; // Dark lines for light images
+    }
+
+    updateStageBackground();
+  };
+  img.onerror = () => {
+    console.error("Failed to load image for color analysis.");
+    gridLineColor = 'rgba(0,0,0,0.5)';
+    updateStageBackground();
+  }
+  img.src = newUrl;
+
   dropHint.style.display = 'none';
 }
 
@@ -493,13 +538,32 @@ gridToggleBtn.addEventListener('click', () => {
 /* ========== Keyboard & wheel handling ========== */
 
 function setN(newN, { fromUser=true } = {}){
+  const oldN = N;
   const clamped = clamp(newN, MIN_N, MAX_N);
   if(clamped === N) return;
   N = clamped;
+
+  // Adjust pan to keep zoom centered on the view
+  if (objectURL) {
+    const stageRect = stage.getBoundingClientRect();
+    const anchorX = stageRect.width / 2;
+    const anchorY = stageRect.height / 2;
+    const ratio = oldN / N;
+
+    panOffset.x = anchorX * (1 - ratio) + panOffset.x * ratio;
+    panOffset.y = anchorY * (1 - ratio) + panOffset.y * ratio;
+  }
+
   updateTop();
   updateStageBackground();
+
   if(fromUser) {
-    showOverlay(`${N} × ${N}`);
+    if (N >= 1) {
+      showOverlay(`${Math.round(N)} × ${Math.round(N)}`);
+    } else {
+      const zoomFactor = 1 / N;
+      showOverlay(`${zoomFactor.toFixed(1)}x Zoom`);
+    }
   }
 }
 
@@ -526,10 +590,11 @@ stage.addEventListener('wheel', (e)=>{
   e.preventDefault();
   const delta = e.deltaY;
   if(delta === 0) return;
-  if(delta < 0){ // wheel away / up
-    setN(N-1);
+  const zoomAmount = 1.1;
+  if(delta < 0){ // wheel away / up -> zoom in
+    setN(N / zoomAmount);
   } else {
-    setN(N+1);
+    setN(N * zoomAmount);
   }
 }, { passive:false });
 
@@ -605,7 +670,7 @@ stage.addEventListener('touchend', (ev)=>{
 });
 
 /* ========== Initialization ========== */
-for (let i = MIN_N; i <= MAX_N; i++) {
+for (let i = 1; i <= MAX_N; i++) {
   const option = document.createElement('option');
   option.value = i;
   option.textContent = `${i} × ${i}`;
