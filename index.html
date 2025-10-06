@@ -658,8 +658,10 @@ stage.addEventListener('wheel', (e)=>{
   }
 }, { passive:false });
 
+/* ========== Panning (left/middle mouse) ========== */
 stage.addEventListener('mousedown', (e)=>{
-  if (e.button === 0 && objectURL) { // left mouse
+  // Allow panning with left (0) or middle (1) mouse button
+  if ((e.button === 0 || e.button === 1) && objectURL) {
     e.preventDefault();
     isPanning = true;
     panStart.x = e.clientX;
@@ -682,7 +684,8 @@ window.addEventListener('mousemove', (e)=>{
 });
 
 window.addEventListener('mouseup', (e)=>{
-  if (isPanning && e.button === 0) { // left mouse
+  // Stop panning on left (0) or middle (1) mouse button release
+  if (isPanning && (e.button === 0 || e.button === 1)) {
     isPanning = false;
     stage.style.cursor = 'default';
   }
