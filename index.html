@@ -5,11 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>LiveTile - Seamless Background Visualizer</title>
 <style>
+  /* ========== Root Variables ========== */
   :root {
     --grid-n: 3;
     --gap: 0px; /* no gutter by default */
     --overlay-opacity: 0.9;
   }
+
+  /* ========== General ========== */
   html,body{
     height:100%;
     margin:0;
@@ -19,7 +22,9 @@
     -webkit-font-smoothing:antialiased;
   }
 
-  /* Top bar */
+  input[type="file"] { display:none; }
+
+  /* ========== Layout ========== */
   .topbar {
     position:fixed;
     left:0; right:0;
@@ -29,21 +34,7 @@
     pointer-events:none;
     z-index:30;
   }
-  .topbar .info {
-    background: rgba(0,0,0,0.5);
-    padding:8px 12px;
-    border-radius:8px;
-    font-weight:600;
-    pointer-events:auto;
-    display:flex;
-    gap:12px;
-    align-items:center;
-    min-width: 140px;
-    justify-content:center;
-  }
-  .topbar button { pointer-events:auto; }
 
-  /* Center area: largest square that fits viewport with margin */
   .stage-wrap {
     position:absolute;
     inset:0;
@@ -56,15 +47,29 @@
 
   .stage {
     width:100%;
-    max-width:calc(100vh - 80px); /* ensure it remains square within viewport height */
+    max-width:calc(100vh - 80px);
     max-height:calc(100vw - 80px);
     aspect-ratio:1 / 1;
     background: linear-gradient(180deg,#222,#111);
     overflow:hidden;
     border-radius:8px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    touch-action: none; /* we'll handle pinch/drag manually */
+    touch-action: none;
     position:relative;
+  }
+
+  /* ========== Components ========== */
+  .info {
+    background: rgba(0,0,0,0.5);
+    padding:8px 12px;
+    border-radius:8px;
+    font-weight:600;
+    pointer-events:auto;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    min-width: 140px;
+    justify-content:center;
   }
 
   .drop-hint {
@@ -80,10 +85,6 @@
     padding:12px;
   }
 
-  /* Tiles are no longer used */
-  .tile {}
-
-  /* temporary overlay when zoom changes */
   .zoom-overlay {
     position:absolute;
     left:50%;
@@ -99,9 +100,7 @@
     transition:opacity 200ms ease;
     z-index:40;
   }
-  .zoom-overlay.show { opacity:1; }
 
-  /* File info / small UI bottom-left */
   .meta {
     position:fixed;
     left:12px;
@@ -113,11 +112,38 @@
     z-index:30;
   }
 
+  .meta .small + .small {
+    margin-top: 4px;
+  }
+
+  .instructions {
+    position:fixed;
+    right:12px;
+    bottom:12px;
+    background: rgba(0,0,0,0.45);
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:12px;
+    z-index:30;
+    max-width:260px;
+  }
+
+  .instructions-header {
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .attribution {
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  /* ========== Controls & Links ========== */
   .controls {
     display:flex;
     gap:8px;
     align-items:center;
-    margin-left: 12px; /* Separate from view controls */
+    margin-left: 12px;
   }
 
   .view-controls {
@@ -125,7 +151,6 @@
     gap: 4px;
   }
 
-  input[type="file"] { display:none; }
   .file-btn {
     background: #1f6feb;
     color:white;
@@ -156,19 +181,6 @@
     display: flex;
     align-items: center;
   }
-  .icon-btn:hover {
-    background: #3a3a3a;
-  }
-  .icon-btn.active {
-    background: #1f6feb;
-    border-color: #1f6feb;
-  }
-
-  button:disabled,
-  select:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
 
   .grid-size-select {
     background: #2a2a2a;
@@ -182,25 +194,43 @@
     text-align: center;
   }
 
-  .small {
-    font-size:12px;
-    opacity:0.9;
+  .credit-link {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #eee;
+    text-decoration: none;
   }
 
-  /* instructions */
-  .instructions {
-    position:fixed;
-    right:12px;
-    bottom:12px;
-    background: rgba(0,0,0,0.45);
-    padding:8px 10px;
-    border-radius:8px;
-    font-size:12px;
-    z-index:30;
-    max-width:260px;
+  /* ========== States & Modifiers ========== */
+  .zoom-overlay.show { opacity:1; }
+  .small { font-size:12px; opacity:0.9; }
+
+  .icon-btn:hover {
+    background: #3a3a3a;
   }
 
-  /* responsive */
+  .icon-btn.active {
+    background: #1f6feb;
+    border-color: #1f6feb;
+  }
+
+  button:disabled,
+  select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .credit-link:hover {
+    color: #1f6feb;
+  }
+
+  .credit-link b {
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  /* ========== Responsive ========== */
   @media (max-width:600px){
     .topbar .info { font-size:13px; padding:6px 10px; }
     .zoom-overlay { font-size:18px; }
@@ -237,17 +267,23 @@
   <div class="meta" id="metaBox">
     <div id="fileName" class="small">No file</div>
     <div id="watchState" class="small">Not watching</div>
-    <div class="small" style="margin-top:6px;">Zoom: + / - (or Home / End)</div>
-    <div class="small" style="margin-top:2px;">Grid: G</div>
-    <div class="small" style="margin-top:2px;">Reset View: R</div>
+    <div class="small meta-line">Zoom: + / - (or Home / End)</div>
+    <div class="small meta-line">Grid: G</div>
+    <div class="small meta-line">Reset View: R</div>
   </div>
 
   <div class="instructions">
-    <div style="font-weight:700;margin-bottom:6px;">How to get live updates</div>
+    <div class="instructions-header">How to get live updates</div>
     <ol style="margin:0 0 0 16px;padding:0;font-size:13px;">
       <li>Drag & drop an image or click <b>Choose file</b> to load it.</li>
       <li>Edit the file in another app and it will update here automatically.</li>
     </ol>
+    <div class="attribution">
+      <a href="https://github.com/shirleyman/live-tile" title="View on GitHub" class="credit-link">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>Created by <b>Shirley Man</b></span>
+      </a>
+    </div>
   </div>
 
 <canvas id="colorSampler" style="display:none;"></canvas>
@@ -403,7 +439,7 @@ function resetView() {
   N = config.DEFAULT_N;
   updateTop();
   updateStageBackground();
-  showOverlay('View Reset');
+  showOverlay('Reset View');
 }
 
 function toggleGrid() {
