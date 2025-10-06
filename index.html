@@ -117,6 +117,12 @@
     display:flex;
     gap:8px;
     align-items:center;
+    margin-left: 12px; /* Separate from view controls */
+  }
+
+  .view-controls {
+    display: flex;
+    gap: 4px;
   }
 
   input[type="file"] { display:none; }
@@ -200,9 +206,14 @@
   <div class="topbar">
     <div class="info" id="topInfo">
       Grid: <select id="gridSizeSelect" class="grid-size-select"></select>
-      <button id="gridToggleBtn" class="icon-btn" title="Toggle grid (G)">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h4v4H0zM6 0h4v4H6zM12 0h4v4h-4zM0 6h4v4H0zM6 6h4v4H6zM12 6h4v4h-4zM0 12h4v4H0zM6 12h4v4H6zM12 12h4v4h-4z"/></svg>
-      </button>
+      <div class="view-controls">
+        <button id="gridToggleBtn" class="icon-btn" title="Toggle grid (G)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h4v4H0zM6 0h4v4H6zM12 0h4v4h-4zM0 6h4v4H0zM6 6h4v4H6zM12 6h4v4h-4zM0 12h4v4H0zM6 12h4v4H6zM12 12h4v4h-4z"/></svg>
+        </button>
+        <button id="resetViewBtn" class="icon-btn" title="Reset View (R)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h5v1H1v4H0V0z M16 0h-5v1h4v4h1V0z M0 16h5v-1H1v-4H0v5z M16 16h-5v-1h4v-4h1v5z"/></svg>
+        </button>
+      </div>
       <div class="controls">
         <button id="chooseFileBtn" class="file-btn">Choose file</button>
         <button id="clearBtn" class="watch-btn">Clear</button>
@@ -222,6 +233,7 @@
     <div id="watchState" class="small">Not watching</div>
     <div class="small" style="margin-top:6px;">Zoom: + / - (or Home / End)</div>
     <div class="small" style="margin-top:2px;">Grid: G</div>
+    <div class="small" style="margin-top:2px;">Reset View: R</div>
   </div>
 
   <div class="instructions">
@@ -248,7 +260,8 @@ let objectURL = null;
 let watching = false;
 let pollTimer = null;
 let gridVisible = false;
-let gridLineColor = 'rgba(0,0,0,0.5)';
+let gridLineColor = 'rgba(0,0,0,0.25)';
+let imageSize = { width: 0, height: 0 };
 
 // Panning state
 let isPanning = false;
@@ -264,6 +277,7 @@ const dropHint = document.getElementById('dropHint');
 const chooseFileBtn = document.getElementById('chooseFileBtn');
 const clearBtn = document.getElementById('clearBtn');
 const gridToggleBtn = document.getElementById('gridToggleBtn');
+const resetViewBtn = document.getElementById('resetViewBtn');
 const fileNameEl = document.getElementById('fileName');
 const watchStateEl = document.getElementById('watchState');
 
@@ -301,28 +315,36 @@ function updatePanPosition() {
 function updateStageBackground() {
     const stageRect = stage.getBoundingClientRect();
     if (stageRect.width === 0) { setTimeout(updateStageBackground, 50); return; }
-    const tileSize = stageRect.width / N;
+
+    let imageTileWidth = 0;
+    let imageTileHeight = 0;
+
+    if (objectURL && imageSize.width > 0) {
+        const imageAspectRatio = imageSize.width / imageSize.height;
+        imageTileWidth = stageRect.width / N;
+        imageTileHeight = imageTileWidth / imageAspectRatio;
+    }
 
     const bgImages = [];
     const bgSizes = [];
     const bgRepeats = [];
 
     // Grid layers (top)
-    if (gridVisible) {
+    if (gridVisible && imageTileWidth > 0) {
         // Horizontal lines
         bgImages.push(`linear-gradient(${gridLineColor} 1px, transparent 1px)`);
-        bgSizes.push(`${tileSize}px ${tileSize}px`);
+        bgSizes.push(`${imageTileWidth}px ${imageTileHeight}px`);
         bgRepeats.push('repeat');
         // Vertical lines
         bgImages.push(`linear-gradient(90deg, ${gridLineColor} 1px, transparent 1px)`);
-        bgSizes.push(`${tileSize}px ${tileSize}px`);
+        bgSizes.push(`${imageTileWidth}px ${imageTileHeight}px`);
         bgRepeats.push('repeat');
     }
 
     // Image layer
-    if (objectURL) {
+    if (objectURL && imageTileWidth > 0) {
         bgImages.push(`url("${objectURL}")`);
-        bgSizes.push('auto');
+        bgSizes.push(`${imageTileWidth}px ${imageTileHeight}px`);
         bgRepeats.push('repeat');
     }
 
@@ -345,6 +367,7 @@ function resetState() {
     objectURL = null;
   }
   fileHandle = null;
+  imageSize = { width: 0, height: 0 };
   panOffset = { x: 0, y: 0 };
   updateStageBackground();
   updateMetaFile(null);
@@ -357,17 +380,21 @@ function toggleGrid() {
   gridToggleBtn.classList.toggle('active', gridVisible);
 }
 
-function refreshTiles(newUrl){
+function refreshTiles(newUrl, { resetView = false } = {}){
   if(objectURL && objectURL !== newUrl){ URL.revokeObjectURL(objectURL); }
   objectURL = newUrl;
 
-  // Reset pan and zoom to default
-  panOffset = { x: 0, y: 0 };
-  N = 3;
-  updateTop();
+  if (resetView) {
+    // Reset pan and zoom to default
+    panOffset = { x: 0, y: 0 };
+    N = 3;
+    updateTop();
+  }
 
   const img = new Image();
   img.onload = () => {
+    imageSize = { width: img.naturalWidth, height: img.naturalHeight };
+
     const canvas = document.getElementById('colorSampler');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     canvas.width = img.naturalWidth;
@@ -387,16 +414,16 @@ function refreshTiles(newUrl){
     const avgLuminance = totalLuminance / (data.length / 4);
 
     if (avgLuminance < 128) {
-      gridLineColor = 'rgba(255,255,255,0.5)'; // Light lines for dark images
+      gridLineColor = 'rgba(255,255,255,0.25)'; // Light lines for dark images
     } else {
-      gridLineColor = 'rgba(0,0,0,0.5)'; // Dark lines for light images
+      gridLineColor = 'rgba(0,0,0,0.25)'; // Dark lines for light images
     }
 
     updateStageBackground();
   };
   img.onerror = () => {
     console.error("Failed to load image for color analysis.");
-    gridLineColor = 'rgba(0,0,0,0.5)';
+    gridLineColor = 'rgba(0,0,0,0.25)';
     updateStageBackground();
   }
   img.src = newUrl;
@@ -418,7 +445,7 @@ async function loadFileFromHandle(handle) {
     const file = await fileHandle.getFile();
     lastModified = file.lastModified || Date.now();
     const url = URL.createObjectURL(file);
-    refreshTiles(url);
+    refreshTiles(url, { resetView: true });
     watching = true;
     updateMetaFile(fileHandle.name);
     startPolling();
@@ -444,7 +471,7 @@ async function startPolling() {
       if (f.lastModified !== lastModified) {
         lastModified = f.lastModified;
         const url = URL.createObjectURL(f);
-        refreshTiles(url);
+        refreshTiles(url, { resetView: false });
       }
     } catch (err) {
       console.warn('Polling error', err);
@@ -491,7 +518,7 @@ window.addEventListener('drop', async ev => {
   const file = dt.files && dt.files[0];
   if (file && file.type.startsWith('image/')) {
     const url = URL.createObjectURL(file);
-    refreshTiles(url);
+    refreshTiles(url, { resetView: true });
     showOverlay(`${N} × ${N}`);
     updateMetaFile(file.name);
     watching = false;
@@ -535,6 +562,10 @@ gridToggleBtn.addEventListener('click', () => {
   toggleGrid();
 });
 
+resetViewBtn.addEventListener('click', () => {
+  resetView();
+});
+
 /* ========== Keyboard & wheel handling ========== */
 
 function setN(newN, { fromUser=true } = {}){
@@ -567,6 +598,15 @@ function setN(newN, { fromUser=true } = {}){
   }
 }
 
+function resetView() {
+  // Reset pan and zoom to default, but keep the image
+  panOffset = { x: 0, y: 0 };
+  N = 3;
+  updateTop();
+  updateStageBackground();
+  showOverlay('View Reset');
+}
+
 window.addEventListener('keydown', (e)=>{
   if(e.key === '+' || e.key === '=' ){
     e.preventDefault();
@@ -583,6 +623,9 @@ window.addEventListener('keydown', (e)=>{
   } else if (e.key === 'g' || e.key === 'G') {
     e.preventDefault();
     toggleGrid();
+  } else if (e.key === 'r' || e.key === 'R') {
+    e.preventDefault();
+    resetView();
   }
 });
 
