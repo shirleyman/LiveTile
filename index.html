@@ -364,6 +364,14 @@ function updateControlsState() {
   clearBtn.disabled = !hasImage;
 }
 
+function checkBrowserSupport() {
+  if (!window.showOpenFilePicker) {
+    alert(
+      'Your browser does not support the File System Access API. Use a Chromium-based browser (Chrome/Edge) and load the page via http://localhost for full functionality.'
+    );
+  }
+}
+
 /* ========== Core Logic ========== */
 function updatePanPosition() {
   const pos = `${panOffset.x}px ${panOffset.y}px`;
@@ -776,6 +784,7 @@ updateTop();
 updateStageBackground();
 updateMetaFile(null);
 updateControlsState();
+checkBrowserSupport();
 
 /* Expose minimal public API for debug (optional) */
 window._liveGrid = {
