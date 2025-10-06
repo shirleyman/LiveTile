@@ -76,13 +76,21 @@
     position:absolute;
     inset:0;
     display:flex;
+    flex-direction:column;
     align-items:center;
     justify-content:center;
+    gap:12px;
     color: #bbb;
     font-size:14px;
     pointer-events:none;
     text-align:center;
     padding:12px;
+  }
+
+  .drop-hint svg {
+    width: 48px;
+    height: 48px;
+    opacity: 0.4;
   }
 
   .zoom-overlay {
@@ -101,19 +109,8 @@
     z-index:40;
   }
 
-  .meta {
-    position:fixed;
-    left:12px;
-    bottom:12px;
-    background: rgba(0,0,0,0.45);
-    padding:8px 10px;
-    border-radius:8px;
-    font-size:13px;
-    z-index:30;
-  }
-
-  .meta .small + .small {
-    margin-top: 4px;
+  #colorSampler {
+    display: none;
   }
 
   .instructions {
@@ -121,11 +118,15 @@
     right:12px;
     bottom:12px;
     background: rgba(0,0,0,0.45);
-    padding:8px 10px;
+    padding:10px 12px;
     border-radius:8px;
     font-size:12px;
     z-index:30;
-    max-width:260px;
+    max-width:280px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
   }
 
   .instructions-header {
@@ -234,8 +235,6 @@
   @media (max-width:600px){
     .topbar .info { font-size:13px; padding:6px 10px; }
     .zoom-overlay { font-size:18px; }
-    .instructions { display:none; }
-    .meta-line { display:none; }
   }
 </style>
 </head>
@@ -260,25 +259,25 @@
 
   <div class="stage-wrap">
     <div id="stage" class="stage" tabindex="0" aria-label="Tiled image stage" >
-      <div class="drop-hint" id="dropHint">Drag & drop an image here, or click "Choose file" to enable live updates.</div>
+      <div class="drop-hint" id="dropHint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Drag & drop an image here, or click "Choose file" to begin.</span>
+      </div>
       <div class="zoom-overlay" id="zoomOverlay">3 × 3</div>
     </div>
   </div>
 
-  <div class="meta" id="metaBox">
+  <div class="instructions">
     <div id="fileName" class="small">No file</div>
     <div id="watchState" class="small">Not watching</div>
-    <div class="small meta-line">Zoom: + / - (or Home / End)</div>
-    <div class="small meta-line">Grid: G</div>
-    <div class="small meta-line">Reset View: R</div>
-  </div>
-
-  <div class="instructions">
-    <div class="instructions-header">How to get live updates</div>
-    <ol style="margin:0 0 0 16px;padding:0;font-size:13px;">
-      <li>Drag & drop an image or click <b>Choose file</b> to load it.</li>
-      <li>Edit the file in another app and it will update here automatically.</li>
-    </ol>
+    <div class="small"><b>Pan:</b> Hold & Drag</div>
+    <div class="small"><b>Zoom:</b> Wheel or +/-</div>
+    <div class="small"><b>Show/Hide Grid:</b> G</div>
+    <div class="small"><b>Reset View:</b> R</div>
     <div class="attribution">
       <a href="https://github.com/shirleyman/live-tile" title="View on GitHub" class="credit-link">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -287,7 +286,7 @@
     </div>
   </div>
 
-<canvas id="colorSampler" style="display:none;"></canvas>
+<canvas id="colorSampler"></canvas>
 <input type="file" id="fallbackFileInput" accept="image/*" />
 
 <script>
