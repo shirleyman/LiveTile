@@ -164,6 +164,12 @@
     border-color: #1f6feb;
   }
 
+  button:disabled,
+  select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
   .grid-size-select {
     background: #2a2a2a;
     color: #eee;
@@ -314,6 +320,14 @@ function updateMetaFile(name){
   watchStateEl.textContent = watching ? 'Watching (live)' : 'Not watching';
 }
 
+function updateControlsState() {
+  const hasImage = !!objectURL;
+  gridSizeSelect.disabled = !hasImage;
+  gridToggleBtn.disabled = !hasImage;
+  resetViewBtn.disabled = !hasImage;
+  clearBtn.disabled = !hasImage;
+}
+
 /* ========== Core Logic ========== */
 function updatePanPosition() {
   const pos = `${panOffset.x}px ${panOffset.y}px`;
@@ -380,6 +394,7 @@ function resetState() {
   updateTop();
   updateStageBackground();
   updateMetaFile(null);
+  updateControlsState();
   dropHint.style.display = 'flex';
 }
 
@@ -438,6 +453,7 @@ function refreshTiles(newUrl, { resetView = false } = {}){
   img.src = newUrl;
 
   dropHint.style.display = 'none';
+  updateControlsState();
 }
 
 /* ========== File Handling & System ========== */
@@ -720,6 +736,7 @@ for (let i = 1; i <= config.MAX_N; i++) {
 updateTop();
 updateStageBackground();
 updateMetaFile(null);
+updateControlsState();
 
 /* Expose minimal public API for debug (optional) */
 window._liveGrid = {
