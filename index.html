@@ -52,7 +52,6 @@
     justify-content:center;
     padding:16px;
     box-sizing:border-box;
-    gap:12px;
   }
 
   .stage {
@@ -61,8 +60,6 @@
     max-height:calc(100vw - 80px);
     aspect-ratio:1 / 1;
     background: linear-gradient(180deg,#222,#111);
-    display:grid;
-    gap: var(--gap);
     overflow:hidden;
     border-radius:8px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.6);
@@ -83,15 +80,8 @@
     padding:12px;
   }
 
-  /* Tiles (we set grid-template dynamically in JS) */
-  .tile {
-    background-color: #333;
-
-    background-repeat:repeat;
-    background-size:cover;
-    width:100%;
-    height:100%;
-  }
+  /* Tiles are no longer used */
+  .tile {}
 
   /* temporary overlay when zoom changes */
   .zoom-overlay {
@@ -255,12 +245,15 @@ let lastModified = 0;
 let objectURL = null;
 let watching = false;
 let pollTimer = null;
-let tiles = [];
 let gridVisible = false;
+
+// Panning state
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOffset = { x: 0, y: 0 };
 let panOffsetAtDragStart = { x: 0, y: 0 };
+
+// DOM elements
 const stage = document.getElementById('stage');
 const gridSizeSelect = document.getElementById('gridSizeSelect');
 const zoomOverlay = document.getElementById('zoomOverlay');
@@ -287,6 +280,58 @@ function updateMetaFile(name){
   watchStateEl.textContent = watching ? 'Watching (live)' : 'Not watching';
 }
 
+/* ========== Core Rendering Logic ========== */
+
+function updatePanPosition() {
+  const pos = `${panOffset.x}px ${panOffset.y}px`;
+  if (!stage.style.backgroundImage || stage.style.backgroundImage === 'none') {
+    return;
+  }
+  const numLayers = stage.style.backgroundImage.split(',').length;
+  stage.style.backgroundPosition = Array(numLayers).fill(pos).join(', ');
+}
+
+function updateStageBackground() {
+    const stageRect = stage.getBoundingClientRect();
+    if (stageRect.width === 0) { setTimeout(updateStageBackground, 50); return; }
+    const tileSize = stageRect.width / N;
+
+    const bgImages = [];
+    const bgSizes = [];
+    const bgRepeats = [];
+
+    // Grid layers (top)
+    if (gridVisible) {
+        const gridLineColor = 'rgba(0,0,0,0.5)';
+        // Horizontal lines
+        bgImages.push(`linear-gradient(${gridLineColor} 1px, transparent 1px)`);
+        bgSizes.push(`${tileSize}px ${tileSize}px`);
+        bgRepeats.push('repeat');
+        // Vertical lines
+        bgImages.push(`linear-gradient(90deg, ${gridLineColor} 1px, transparent 1px)`);
+        bgSizes.push(`${tileSize}px ${tileSize}px`);
+        bgRepeats.push('repeat');
+    }
+
+    // Image layer
+    if (objectURL) {
+        bgImages.push(`url("${objectURL}")`);
+        bgSizes.push('auto');
+        bgRepeats.push('repeat');
+    }
+
+    // Base gradient (bottom)
+    bgImages.push('linear-gradient(180deg, #222, #111)');
+    bgSizes.push('cover');
+    bgRepeats.push('no-repeat');
+
+    stage.style.backgroundImage = bgImages.join(', ');
+    stage.style.backgroundSize = bgSizes.join(', ');
+    stage.style.backgroundRepeat = bgRepeats.join(', ');
+
+    updatePanPosition();
+}
+
 function resetState() {
   stopPolling();
   if (objectURL) {
@@ -295,82 +340,22 @@ function resetState() {
   }
   fileHandle = null;
   panOffset = { x: 0, y: 0 };
-  renderGrid();
+  updateStageBackground();
   updateMetaFile(null);
   dropHint.style.display = 'flex';
 }
 
 function toggleGrid() {
   gridVisible = !gridVisible;
-  stage.style.setProperty('--gap', gridVisible ? '1px' : '0px');
+  updateStageBackground();
   gridToggleBtn.classList.toggle('active', gridVisible);
 }
 
-/* ========== Grid rendering ========== */
-function renderGrid(){
-  // clear children
-  stage.innerHTML = '';
-  stage.appendChild(dropHint);
-  stage.appendChild(zoomOverlay);
-  // compute template
-  stage.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
-  stage.style.gridTemplateRows = `repeat(${N}, 1fr)`;
-  // create tiles
-  tiles = [];
-  const total = N * N;
-  for(let i=0;i<total;i++){
-    const d = document.createElement('div');
-    d.className = 'tile';
-    stage.appendChild(d);
-    tiles.push(d);
-  }
-
-  if (objectURL) {
-    const stageRect = stage.getBoundingClientRect();
-    const gap = gridVisible ? 1 : 0;
-    const tileWidth = (stageRect.width - (N - 1) * gap) / N;
-    const tileHeight = (stageRect.height - (N - 1) * gap) / N;
-
-    tiles.forEach((d, i) => {
-      d.style.backgroundImage = `url("${objectURL}")`;
-      const row = Math.floor(i / N);
-      const col = i % N;
-      const xPos = panOffset.x - (col * tileWidth);
-      const yPos = panOffset.y - (row * tileHeight);
-      d.style.backgroundPosition = `${xPos}px ${yPos}px`;
-    });
-  }
-  updateTop();
-}
-
-/* Update tile images in-place */
 function refreshTiles(newUrl){
-  // revoke old
   if(objectURL && objectURL !== newUrl){ URL.revokeObjectURL(objectURL); }
   objectURL = newUrl;
-  panOffset = { x: 0, y: 0 }; // Reset pan
-
-  if (!tiles.length) {
-    renderGrid();
-    return;
-  }
-
-  const tileRect = tiles[0].getBoundingClientRect();
-  if (tileRect.width === 0) { // Tiles not rendered yet
-      setTimeout(() => refreshTiles(newUrl), 50); // Retry
-      return;
-  }
-  const tileWidth = tileRect.width;
-  const tileHeight = tileRect.height;
-
-  tiles.forEach((t, i) => {
-    t.style.backgroundImage = `url("${objectURL}")`;
-    const row = Math.floor(i / N);
-    const col = i % N;
-    const xPos = -(col * tileWidth);
-    const yPos = -(row * tileHeight);
-    t.style.backgroundPosition = `${xPos}px ${yPos}px`;
-  });
+  panOffset = { x: 0, y: 0 };
+  updateStageBackground();
   dropHint.style.display = 'none';
 }
 
@@ -446,7 +431,6 @@ window.addEventListener('drop', async ev => {
   const dt = ev.dataTransfer;
   if (!dt) return;
 
-  // Try to get a handle for live updates
   if (dt.items && dt.items[0] && typeof dt.items[0].getAsFileSystemHandle === 'function') {
     try {
       const handle = await dt.items[0].getAsFileSystemHandle();
@@ -459,7 +443,6 @@ window.addEventListener('drop', async ev => {
     }
   }
 
-  // Fallback for browsers that don't support getAsFileSystemHandle
   const file = dt.files && dt.files[0];
   if (file && file.type.startsWith('image/')) {
     const url = URL.createObjectURL(file);
@@ -513,14 +496,14 @@ function setN(newN, { fromUser=true } = {}){
   const clamped = clamp(newN, MIN_N, MAX_N);
   if(clamped === N) return;
   N = clamped;
-  renderGrid(); // renderGrid now handles reapplying the image correctly
+  updateTop();
+  updateStageBackground();
   if(fromUser) {
     showOverlay(`${N} × ${N}`);
   }
 }
 
 window.addEventListener('keydown', (e)=>{
-  // allow when stage has focus or always catch
   if(e.key === '+' || e.key === '=' ){
     e.preventDefault();
     setN(N+1);
@@ -539,9 +522,7 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-/* Wheel: map deltaY < 0 (wheel away/up) => decrease grid (zoom in) */
 stage.addEventListener('wheel', (e)=>{
-  // only when pointer over stage
   e.preventDefault();
   const delta = e.deltaY;
   if(delta === 0) return;
@@ -553,23 +534,7 @@ stage.addEventListener('wheel', (e)=>{
 }, { passive:false });
 
 /* ========== Panning (middle mouse) ========== */
-function updatePanPosition() {
-  if (!tiles.length || !objectURL) return;
-  const tileRect = tiles[0].getBoundingClientRect();
-  if (tileRect.width === 0) return;
-  const tileWidth = tileRect.width;
-  const tileHeight = tileRect.height;
-
-  tiles.forEach((tile, i) => {
-    const row = Math.floor(i / N);
-    const col = i % N;
-    const xPos = panOffset.x - (col * tileWidth);
-    const yPos = panOffset.y - (row * tileHeight);
-    tile.style.backgroundPosition = `${xPos}px ${yPos}px`;
-  });
-}
-
-stage.addEventListener('mousedown', e => {
+stage.addEventListener('mousedown', (e)=>{
   if (e.button === 1 && objectURL) { // middle mouse
     e.preventDefault();
     isPanning = true;
@@ -581,7 +546,7 @@ stage.addEventListener('mousedown', e => {
   }
 });
 
-window.addEventListener('mousemove', e => {
+window.addEventListener('mousemove', (e)=>{
   if (isPanning) {
     e.preventDefault();
     const dx = e.clientX - panStart.x;
@@ -592,16 +557,14 @@ window.addEventListener('mousemove', e => {
   }
 });
 
-window.addEventListener('mouseup', e => {
+window.addEventListener('mouseup', (e)=>{
   if (isPanning && e.button === 1) {
     isPanning = false;
     stage.style.cursor = 'default';
   }
 });
 
-
 /* ========== Touch / pinch handling ========== */
-let ongoingTouches = [];
 let pinchState = null;
 
 function getDistance(t1, t2){
@@ -624,8 +587,6 @@ stage.addEventListener('touchmove', (ev)=>{
     ev.preventDefault();
     const curDist = getDistance(ev.touches[0], ev.touches[1]);
     const ratio = curDist / pinchState.startDist;
-    // map ratio thresholds to integer steps
-    // e.g., every 12% change -> 1 step; this prevents oversensitive jumps
     const step = Math.round(Math.log2(ratio) / Math.log2(1.12)); // approximate
     if(step !== 0){
       const target = clamp(pinchState.lastApplied + step, MIN_N, MAX_N);
@@ -656,12 +617,13 @@ gridSizeSelect.addEventListener('change', e => {
   setN(newN);
 });
 
-renderGrid();
+updateTop();
+updateStageBackground();
 updateMetaFile(null);
 
 /* Expose minimal public API for debug (optional) */
 window._liveGrid = {
-  setN, renderGrid
+  setN, updateStageBackground
 };
 </script>
 </body>
