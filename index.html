@@ -539,16 +539,16 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-/* Wheel: map deltaY < 0 (wheel away/up) => increase grid */
+/* Wheel: map deltaY < 0 (wheel away/up) => decrease grid (zoom in) */
 stage.addEventListener('wheel', (e)=>{
   // only when pointer over stage
   e.preventDefault();
   const delta = e.deltaY;
   if(delta === 0) return;
   if(delta < 0){ // wheel away / up
-    setN(N+1);
-  } else {
     setN(N-1);
+  } else {
+    setN(N+1);
   }
 }, { passive:false });
 
