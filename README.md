@@ -6,33 +6,40 @@ A simple, client-side tool for visualizing seamless tiles in real-time.
 
 ## Features
 
-*   **Live Reload:** Automatically updates the tiled image when the source file is saved.
-*   **Drag and Drop:** Simply drag your image file onto the grid to get started.
-*   **Adjustable Grid Size:** Change the grid dimensions using a dropdown, mouse wheel, keyboard shortcuts, or pinch gestures.
-*   **Grid Overlay:** Toggle a grid overlay to better visualize the tile edges.
-*   **Cross-platform:** Works in any modern browser that supports the File System Access API (Chrome, Edge, Opera).
+*   **Cross-Platform & Mobile Friendly:** Works in all modern browsers, including Safari and mobile browsers.
+*   **Panning & Zooming:** Pan the view by dragging with your mouse or finger. Zoom with the mouse wheel or by pinching on a touch device.
+*   **Live Reload:** In supported browsers (Chrome, Edge), the image automatically updates when you save the source file.
+*   **Standard File Loading:** On browsers without live reload support (like Safari and mobile), you can still load images using the "Choose file" button.
+*   **Adjustable Grid Size:** Change the grid dimensions to see how your tile repeats.
+*   **Adaptive Grid Overlay:** Toggle a grid overlay that automatically adjusts its color for visibility against your image.
+*   **View Controls:** Easily reset the pan and zoom or clear the image entirely.
 
 ## How to Use
 
 1.  **Open the page:**
     *   https://shirleyman.github.io/live-tile/
-      
-3.  **Load an image:**
-    *   Drag and drop your image file onto the grid.
+
+2.  **Load an image:**
+    *   Drag and drop your image file onto the stage.
     *   Or, click the "Choose file" button to select an image.
+    *   *(Note: Live reload is only active when using "Choose file" on supported browsers like Chrome or Edge).*
 
-4.  **Adjust the grid:**
-    *   Use the dropdown menu in the top bar.
-    *   Use your mouse wheel over the grid.
-    *   Use the `+` and `-` keys, or `Home` and `End` keys.
-    *   Pinch to zoom on a touch device.
+3.  **Navigate & Adjust:**
+    *   **Pan:** Click and drag with your mouse, or drag with one finger on a touch screen.
+    *   **Zoom / Change Grid Size:**
+        *   Use the mouse wheel.
+        *   Pinch with two fingers on a touch screen.
+        *   Use the dropdown menu in the top bar.
+        *   Use the `+`, `-`, `Home`, and `End` keys on a keyboard.
 
-5.  **Toggle the grid overlay:**
-    *   Click the grid icon in the top bar.
-    *   Press the `G` key.
+4.  **Toggle the grid overlay:**
+    *   Click the grid icon in the top bar or press the `G` key.
 
-6.  **Live edit:**
-    *   Open your image file in your favorite editor (e.g., Photoshop, Aseprite).
+5.  **Reset the view:**
+    *   Click the reset icon in the top bar or press the `R` key.
+
+6.  **Live edit (Supported Browsers Only):**
+    *   After loading a file via "Choose file" in Chrome or Edge, open the same file in your favorite editor (e.g., Photoshop, Aseprite).
     *   Make your changes and save the file.
     *   The image in Live Tile will update automatically.
 
