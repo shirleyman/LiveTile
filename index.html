@@ -248,19 +248,26 @@
 
 <script>
 /* ========== Configuration ========== */
-const MIN_N = 0.25;
-const MAX_N = 10;
-const POLL_MS = 200; // throttle file polling
+const config = {
+  MIN_N: 0.25,
+  MAX_N: 10,
+  DEFAULT_N: 3,
+  POLL_MS: 200,
+  ZOOM_AMOUNT: 1.1,
+  LUMINANCE_THRESHOLD: 128,
+  LIGHT_GRID_COLOR: 'rgba(255,255,255,0.25)',
+  DARK_GRID_COLOR: 'rgba(0,0,0,0.25)'
+};
 
 /* ========== State ========== */
-let N = 3;
-let fileHandle = null;      // FileSystemFileHandle when granted
+let N = config.DEFAULT_N;
+let fileHandle = null;
 let lastModified = 0;
 let objectURL = null;
 let watching = false;
 let pollTimer = null;
 let gridVisible = false;
-let gridLineColor = 'rgba(0,0,0,0.25)';
+let gridLineColor = config.DARK_GRID_COLOR;
 let imageSize = { width: 0, height: 0 };
 
 // Panning state
@@ -269,7 +276,10 @@ let panStart = { x: 0, y: 0 };
 let panOffset = { x: 0, y: 0 };
 let panOffsetAtDragStart = { x: 0, y: 0 };
 
-// DOM elements
+// Touch state
+let pinchState = null;
+
+/* ========== DOM Elements ========== */
 const stage = document.getElementById('stage');
 const gridSizeSelect = document.getElementById('gridSizeSelect');
 const zoomOverlay = document.getElementById('zoomOverlay');
@@ -283,12 +293,14 @@ const watchStateEl = document.getElementById('watchState');
 
 /* ========== Helpers ========== */
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
 function showOverlay(text, duration=700){
   zoomOverlay.textContent = text;
   zoomOverlay.classList.add('show');
   clearTimeout(zoomOverlay._to);
   zoomOverlay._to = setTimeout(()=>zoomOverlay.classList.remove('show'), duration);
 }
+
 function updateTop() {
   if (N >= 1) {
     gridSizeSelect.value = Math.round(N);
@@ -296,13 +308,13 @@ function updateTop() {
     gridSizeSelect.value = 1;
   }
 }
+
 function updateMetaFile(name){
   fileNameEl.textContent = name ? name : 'No file';
   watchStateEl.textContent = watching ? 'Watching (live)' : 'Not watching';
 }
 
-/* ========== Core Rendering Logic ========== */
-
+/* ========== Core Logic ========== */
 function updatePanPosition() {
   const pos = `${panOffset.x}px ${panOffset.y}px`;
   if (!stage.style.backgroundImage || stage.style.backgroundImage === 'none') {
@@ -329,26 +341,21 @@ function updateStageBackground() {
     const bgSizes = [];
     const bgRepeats = [];
 
-    // Grid layers (top)
     if (gridVisible && imageTileWidth > 0) {
-        // Horizontal lines
         bgImages.push(`linear-gradient(${gridLineColor} 1px, transparent 1px)`);
         bgSizes.push(`${imageTileWidth}px ${imageTileHeight}px`);
         bgRepeats.push('repeat');
-        // Vertical lines
         bgImages.push(`linear-gradient(90deg, ${gridLineColor} 1px, transparent 1px)`);
         bgSizes.push(`${imageTileWidth}px ${imageTileHeight}px`);
         bgRepeats.push('repeat');
     }
 
-    // Image layer
     if (objectURL && imageTileWidth > 0) {
         bgImages.push(`url("${objectURL}")`);
         bgSizes.push(`${imageTileWidth}px ${imageTileHeight}px`);
         bgRepeats.push('repeat');
     }
 
-    // Base gradient (bottom)
     bgImages.push('linear-gradient(180deg, #222, #111)');
     bgSizes.push('cover');
     bgRepeats.push('no-repeat');
@@ -369,9 +376,19 @@ function resetState() {
   fileHandle = null;
   imageSize = { width: 0, height: 0 };
   panOffset = { x: 0, y: 0 };
+  N = config.DEFAULT_N;
+  updateTop();
   updateStageBackground();
   updateMetaFile(null);
   dropHint.style.display = 'flex';
+}
+
+function resetView() {
+  panOffset = { x: 0, y: 0 };
+  N = config.DEFAULT_N;
+  updateTop();
+  updateStageBackground();
+  showOverlay('View Reset');
 }
 
 function toggleGrid() {
@@ -385,9 +402,8 @@ function refreshTiles(newUrl, { resetView = false } = {}){
   objectURL = newUrl;
 
   if (resetView) {
-    // Reset pan and zoom to default
     panOffset = { x: 0, y: 0 };
-    N = 3;
+    N = config.DEFAULT_N;
     updateTop();
   }
 
@@ -405,25 +421,18 @@ function refreshTiles(newUrl, { resetView = false } = {}){
     const data = imageData.data;
     let totalLuminance = 0;
     for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i+1];
-      const b = data[i+2];
-      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const luminance = 0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2];
       totalLuminance += luminance;
     }
     const avgLuminance = totalLuminance / (data.length / 4);
 
-    if (avgLuminance < 128) {
-      gridLineColor = 'rgba(255,255,255,0.25)'; // Light lines for dark images
-    } else {
-      gridLineColor = 'rgba(0,0,0,0.25)'; // Dark lines for light images
-    }
+    gridLineColor = (avgLuminance < config.LUMINANCE_THRESHOLD) ? config.LIGHT_GRID_COLOR : config.DARK_GRID_COLOR;
 
     updateStageBackground();
   };
   img.onerror = () => {
     console.error("Failed to load image for color analysis.");
-    gridLineColor = 'rgba(0,0,0,0.25)';
+    gridLineColor = config.DARK_GRID_COLOR;
     updateStageBackground();
   }
   img.src = newUrl;
@@ -431,7 +440,7 @@ function refreshTiles(newUrl, { resetView = false } = {}){
   dropHint.style.display = 'none';
 }
 
-/* ========== File handling ========== */
+/* ========== File Handling & System ========== */
 async function loadFileFromHandle(handle) {
   fileHandle = handle;
   if (!fileHandle) return;
@@ -477,7 +486,7 @@ async function startPolling() {
       console.warn('Polling error', err);
       stopPolling();
     }
-  }, POLL_MS);
+  }, config.POLL_MS);
 }
 
 function stopPolling() {
@@ -489,7 +498,7 @@ function stopPolling() {
   updateMetaFile(fileHandle ? fileHandle.name || 'file' : null);
 }
 
-/* ========== Drag & Drop & file choose ========== */
+/* ========== Event Listeners ========== */
 function preventEv(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -566,15 +575,17 @@ resetViewBtn.addEventListener('click', () => {
   resetView();
 });
 
-/* ========== Keyboard & wheel handling ========== */
+gridSizeSelect.addEventListener('change', e => {
+  const newN = parseInt(e.target.value, 10);
+  setN(newN);
+});
 
 function setN(newN, { fromUser=true } = {}){
   const oldN = N;
-  const clamped = clamp(newN, MIN_N, MAX_N);
+  const clamped = clamp(newN, config.MIN_N, config.MAX_N);
   if(clamped === N) return;
   N = clamped;
 
-  // Adjust pan to keep zoom centered on the view
   if (objectURL) {
     const stageRect = stage.getBoundingClientRect();
     const anchorX = stageRect.width / 2;
@@ -598,15 +609,6 @@ function setN(newN, { fromUser=true } = {}){
   }
 }
 
-function resetView() {
-  // Reset pan and zoom to default, but keep the image
-  panOffset = { x: 0, y: 0 };
-  N = 3;
-  updateTop();
-  updateStageBackground();
-  showOverlay('View Reset');
-}
-
 window.addEventListener('keydown', (e)=>{
   if(e.key === '+' || e.key === '=' ){
     e.preventDefault();
@@ -616,10 +618,10 @@ window.addEventListener('keydown', (e)=>{
     setN(N-1);
   } else if(e.key === 'Home'){
     e.preventDefault();
-    setN(MIN_N);
+    setN(config.MIN_N);
   } else if(e.key === 'End'){
     e.preventDefault();
-    setN(MAX_N);
+    setN(config.MAX_N);
   } else if (e.key === 'g' || e.key === 'G') {
     e.preventDefault();
     toggleGrid();
@@ -633,15 +635,13 @@ stage.addEventListener('wheel', (e)=>{
   e.preventDefault();
   const delta = e.deltaY;
   if(delta === 0) return;
-  const zoomAmount = 1.1;
-  if(delta < 0){ // wheel away / up -> zoom in
-    setN(N / zoomAmount);
+  if(delta < 0){
+    setN(N / config.ZOOM_AMOUNT);
   } else {
-    setN(N * zoomAmount);
+    setN(N * config.ZOOM_AMOUNT);
   }
 }, { passive:false });
 
-/* ========== Panning (left mouse) ========== */
 stage.addEventListener('mousedown', (e)=>{
   if (e.button === 0 && objectURL) { // left mouse
     e.preventDefault();
@@ -672,9 +672,6 @@ window.addEventListener('mouseup', (e)=>{
   }
 });
 
-/* ========== Touch / pinch handling ========== */
-let pinchState = null;
-
 function getDistance(t1, t2){
   const dx = t2.clientX - t1.clientX;
   const dy = t2.clientY - t1.clientY;
@@ -695,9 +692,9 @@ stage.addEventListener('touchmove', (ev)=>{
     ev.preventDefault();
     const curDist = getDistance(ev.touches[0], ev.touches[1]);
     const ratio = curDist / pinchState.startDist;
-    const step = Math.round(Math.log2(ratio) / Math.log2(1.12)); // approximate
+    const step = Math.round(Math.log2(ratio) / Math.log2(1.12));
     if(step !== 0){
-      const target = clamp(pinchState.lastApplied + step, MIN_N, MAX_N);
+      const target = clamp(pinchState.lastApplied + step, config.MIN_N, config.MAX_N);
       if(target !== N){
         setN(target);
         pinchState.lastApplied = target;
@@ -713,17 +710,12 @@ stage.addEventListener('touchend', (ev)=>{
 });
 
 /* ========== Initialization ========== */
-for (let i = 1; i <= MAX_N; i++) {
+for (let i = 1; i <= config.MAX_N; i++) {
   const option = document.createElement('option');
   option.value = i;
   option.textContent = `${i} × ${i}`;
   gridSizeSelect.appendChild(option);
 }
-
-gridSizeSelect.addEventListener('change', e => {
-  const newN = parseInt(e.target.value, 10);
-  setN(newN);
-});
 
 updateTop();
 updateStageBackground();
