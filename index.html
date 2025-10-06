@@ -9,7 +9,7 @@
   :root {
     --grid-n: 3;
     --gap: 0px; /* no gutter by default */
-    --overlay-opacity: 0.9;
+    --overlay-opacity: 0.75;
   }
 
   /* ========== General ========== */
@@ -52,7 +52,7 @@
 
   /* ========== Components ========== */
   .info {
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,var(--overlay-opacity));
     padding:8px 12px;
     border-radius:8px;
     font-weight:600;
@@ -90,7 +90,7 @@
     left:50%;
     top:50%;
     transform:translate(-50%,-50%);
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,var(--overlay-opacity));
     padding:12px 18px;
     border-radius:10px;
     font-size:20px;
@@ -109,7 +109,7 @@
     position:fixed;
     right:12px;
     bottom:12px;
-    background: rgba(0,0,0,0.45);
+    background: rgba(0,0,0,var(--overlay-opacity));
     padding:10px 12px;
     border-radius:8px;
     font-size:12px;
