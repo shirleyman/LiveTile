@@ -38,22 +38,14 @@
   .stage-wrap {
     position:absolute;
     inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:16px;
     box-sizing:border-box;
   }
 
   .stage {
     width:100%;
-    max-width:calc(100vh - 80px);
-    max-height:calc(100vw - 80px);
-    aspect-ratio:1 / 1;
+    height: 100%;
     background: linear-gradient(180deg,#222,#111);
     overflow:hidden;
-    border-radius:8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
     touch-action: none;
     position:relative;
   }
