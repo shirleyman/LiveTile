@@ -181,16 +181,17 @@
     align-items: center;
   }
 
-  .grid-size-select {
+  .zoom-display {
     background: #2a2a2a;
     color: #eee;
     border: 1px solid rgba(255,255,255,0.1);
-    padding: 4px 8px;
+    padding: 5px 10px;
     border-radius: 4px;
     font-weight: 600;
-    -webkit-appearance: none;
-    appearance: none;
     text-align: center;
+    min-width: 4.5em;
+    display: inline-block;
+    vertical-align: middle;
   }
 
   .credit-link {
@@ -218,6 +219,10 @@
   select:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .zoom-display.disabled {
+    opacity: 0.4;
   }
 
   .credit-link:hover {
@@ -250,7 +255,7 @@
 <body>
   <div class="topbar">
     <div class="info" id="topInfo">
-      Grid: <select id="gridSizeSelect" class="grid-size-select"></select>
+      Zoom: <span id="zoomDisplay" class="zoom-display">1.0x</span>
       <div class="view-controls">
         <button id="gridToggleBtn" class="icon-btn" title="Toggle grid (G)">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h4v4H0zM6 0h4v4H6zM12 0h4v4h-4zM0 6h4v4H0zM6 6h4v4H6zM12 6h4v4h-4zM0 12h4v4H0zM6 12h4v4H6zM12 12h4v4h-4z"/></svg>
@@ -349,7 +354,7 @@ const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 /* ========== DOM Elements ========== */
 const stage = document.getElementById('stage');
-const gridSizeSelect = document.getElementById('gridSizeSelect');
+const zoomDisplay = document.getElementById('zoomDisplay');
 const zoomOverlay = document.getElementById('zoomOverlay');
 const dropHint = document.getElementById('dropHint');
 const chooseFileBtn = document.getElementById('chooseFileBtn');
@@ -374,11 +379,27 @@ function showOverlay(text, duration=700){
   zoomOverlay._to = setTimeout(()=>zoomOverlay.classList.remove('show'), duration);
 }
 
-function updateTop() {
-  if (N >= 1) {
-    gridSizeSelect.value = Math.round(N);
+function getEffectiveZoom() {
+  if (objectURL && imageSize.width > 0) {
+    const stageRect = stage.getBoundingClientRect();
+    return stageRect.width / (N * imageSize.width);
+  }
+  return null;
+}
+
+function showZoomOverlay() {
+  const zoom = getEffectiveZoom();
+  if (zoom !== null) {
+    showOverlay(`${zoom.toFixed(1)}x Zoom`);
+  }
+}
+
+function updateZoomDisplay() {
+  const zoom = getEffectiveZoom();
+  if (zoom !== null) {
+    zoomDisplay.textContent = `${zoom.toFixed(1)}x`;
   } else {
-    gridSizeSelect.value = 1;
+    zoomDisplay.textContent = '1.0x';
   }
 }
 
@@ -406,7 +427,7 @@ function updateMetaFile(name){
 
 function updateControlsState() {
   const hasImage = !!objectURL;
-  gridSizeSelect.disabled = !hasImage;
+  zoomDisplay.classList.toggle('disabled', !hasImage);
   gridToggleBtn.disabled = !hasImage;
   resetViewBtn.disabled = !hasImage;
   clearBtn.disabled = !hasImage;
@@ -475,7 +496,7 @@ function resetState() {
   imageSize = { width: 0, height: 0 };
   panOffset = { x: 0, y: 0 };
   N = config.DEFAULT_N;
-  updateTop();
+  updateZoomDisplay();
   updateStageBackground();
   updateMetaFile(null);
   updateControlsState();
@@ -484,8 +505,14 @@ function resetState() {
 
 function resetView() {
   panOffset = { x: 0, y: 0 };
-  N = config.DEFAULT_N;
-  updateTop();
+  if (objectURL && imageSize.width > 0) {
+    const stageRect = stage.getBoundingClientRect();
+    const newN = stageRect.width / imageSize.width;
+    N = clamp(newN, config.MIN_N, config.MAX_N);
+  } else {
+    N = config.DEFAULT_N;
+  }
+  updateZoomDisplay();
   updateStageBackground();
   showOverlay('Reset View');
 }
@@ -496,15 +523,29 @@ function toggleGrid() {
   gridToggleBtn.classList.toggle('active', gridVisible);
 }
 
-function refreshTiles(newUrl, { resetView = false } = {}){
-  if(objectURL && objectURL !== newUrl){ URL.revokeObjectURL(objectURL); }
-  objectURL = newUrl;
+function finalizeImageLoad(resetView) {
+  const stageRect = stage.getBoundingClientRect();
+  if (stageRect.width === 0) {
+    setTimeout(() => finalizeImageLoad(resetView), 50);
+    return;
+  }
 
   if (resetView) {
     panOffset = { x: 0, y: 0 };
-    N = config.DEFAULT_N;
-    updateTop();
+    const newN = stageRect.width / imageSize.width;
+    N = clamp(newN, config.MIN_N, config.MAX_N);
   }
+
+  updateStageBackground();
+  updateZoomDisplay();
+  if (resetView) {
+    showZoomOverlay();
+  }
+}
+
+function refreshTiles(newUrl, { resetView = false } = {}){
+  if(objectURL && objectURL !== newUrl){ URL.revokeObjectURL(objectURL); }
+  objectURL = newUrl;
 
   const img = new Image();
   img.onload = () => {
@@ -527,7 +568,7 @@ function refreshTiles(newUrl, { resetView = false } = {}){
 
     gridLineColor = (avgLuminance < config.LUMINANCE_THRESHOLD) ? config.LIGHT_GRID_COLOR : config.DARK_GRID_COLOR;
 
-    updateStageBackground();
+    finalizeImageLoad(resetView);
   };
   img.onerror = () => {
     console.error("Failed to load image for color analysis.");
@@ -558,7 +599,6 @@ async function loadFileFromHandle(handle) {
     watching = true;
     updateMetaFile(fileHandle.name);
     startPolling();
-    showOverlay(`${N} × ${N}`);
   } catch (err) {
     console.error('Error loading file:', err);
     alert('Could not load the file. Please try again.');
@@ -631,7 +671,6 @@ window.addEventListener('drop', async ev => {
 
     const url = URL.createObjectURL(file);
     refreshTiles(url, { resetView: true });
-    showOverlay(`${N} × ${N}`);
     updateMetaFile(file.name);
   } else {
     alert('Please drop an image file (PNG / JPEG).');
@@ -668,7 +707,6 @@ fallbackFileInput.addEventListener('change', (e) => {
 
     const url = URL.createObjectURL(file);
     refreshTiles(url, { resetView: true });
-    showOverlay(`${N} × ${N}`);
     updateMetaFile(file.name);
 
     // Reset the input so the same file can be chosen again
@@ -688,10 +726,7 @@ resetViewBtn.addEventListener('click', () => {
   resetView();
 });
 
-gridSizeSelect.addEventListener('change', e => {
-  const newN = parseInt(e.target.value, 10);
-  setN(newN);
-});
+
 
 function setN(newN, { fromUser=true } = {}){
   const oldN = N;
@@ -709,16 +744,11 @@ function setN(newN, { fromUser=true } = {}){
     panOffset.y = anchorY * (1 - ratio) + panOffset.y * ratio;
   }
 
-  updateTop();
+  updateZoomDisplay();
   updateStageBackground();
 
   if(fromUser) {
-    if (N >= 1) {
-      showOverlay(`${Math.round(N)} × ${Math.round(N)}`);
-    } else {
-      const zoomFactor = 1 / N;
-      showOverlay(`${zoomFactor.toFixed(1)}x Zoom`);
-    }
+    showZoomOverlay();
   }
 }
 
@@ -855,14 +885,7 @@ stage.addEventListener('touchend', (ev) => {
 });
 
 /* ========== Initialization ========== */
-for (let i = 1; i <= config.MAX_N; i++) {
-  const option = document.createElement('option');
-  option.value = i;
-  option.textContent = `${i} × ${i}`;
-  gridSizeSelect.appendChild(option);
-}
-
-updateTop();
+updateZoomDisplay();
 updateStageBackground();
 updateMetaFile(null);
 updateControlsState();
