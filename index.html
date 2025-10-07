@@ -257,8 +257,11 @@
     <div class="info" id="topInfo">
       Zoom: <span id="zoomDisplay" class="zoom-display">1.0x</span>
       <div class="view-controls">
-        <button id="gridToggleBtn" class="icon-btn" title="Toggle grid (G)">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h4v4H0zM6 0h4v4H6zM12 0h4v4h-4zM0 6h4v4H0zM6 6h4v4H6zM12 6h4v4h-4zM0 12h4v4H0zM6 12h4v4H6zM12 12h4v4h-4z"/></svg>
+        <button id="gridToggleBtn" class="icon-btn" title="Show/Hide Grid (G)">
+          <svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1" fill="none">
+            <rect x="0.5" y="0.5" width="15" height="15"/>
+            <path d="M0 5.5H16M0 10.5H16M5.5 0V16M10.5 0V16"/>
+          </svg>
         </button>
         <button id="resetViewBtn" class="icon-btn" title="Reset View (R)">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h5v1H1v4H0V0z M16 0h-5v1h4v4h1V0z M0 16h5v-1H1v-4H0v5z M16 16h-5v-1h4v-4h1v5z"/></svg>
