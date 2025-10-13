@@ -39,7 +39,7 @@ A simple, client-side tool for visualizing seamless tiles in real-time.
     *   Click the reset icon in the top bar or press the `R` key.
 
 6.  **Live edit (Supported Browsers Only):**
-    *   After loading a file via "Choose file" in Chrome or Edge, open the same file in your favorite editor (e.g., Photoshop, Aseprite).
+    *   After loading a file, open the same file in your favorite editor (e.g., Photoshop, Aseprite).
     *   Make your changes and save the file.
     *   The image in Live Tile will update automatically.
 
